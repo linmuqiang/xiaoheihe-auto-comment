@@ -1,0 +1,20 @@
+# 忽略的文件和目录
+*.txt
+node_modules/
+xhh-cookie.json
+.env
+
+# 其他常见的忽略项
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE相关文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
