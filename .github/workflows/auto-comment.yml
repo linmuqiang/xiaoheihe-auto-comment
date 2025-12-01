@@ -34,7 +34,7 @@ jobs:
       - name: 安装项目依赖
         run: |
           npm config set registry https://registry.npmmirror.com   # 切换淘宝源加速
-          npm install puppeteer node-schedule fs-extra  # 安装依赖
+          npm install puppeteer fs-extra  # 安装依赖（不再需要node-schedule）
 
       # 步骤5：执行自动评论脚本
       - name: 运行评论脚本
