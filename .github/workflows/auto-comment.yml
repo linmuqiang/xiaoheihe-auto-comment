@@ -1,0 +1,45 @@
+name: 小黑盒自动随机评论
+
+on:
+  # 1. 定时触发：每天早上 8 点（北京时间）执行
+  # 注意：GitHub Actions 使用 UTC 时区，北京时间 = UTC+8，所以 UTC 0 点 = 北京时间 8 点
+  schedule:
+    - cron: '0 0 * * *'  # 格式：秒 分 时 日 月 周（UTC时间）
+  # 2. 手动触发（方便测试）
+  workflow_dispatch:
+
+# 运行环境：选择 Ubuntu 最新版（支持 Puppeteer 无头浏览器）
+jobs:
+  comment-job:
+    runs-on: ubuntu-latest
+    steps:
+      # 步骤1：拉取仓库代码
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      # 步骤2：安装 Node.js（匹配脚本所需版本，推荐 16+）
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'  # 缓存 npm 依赖，加速下次运行
+
+      # 步骤3：安装 Puppeteer 依赖（Ubuntu 环境需要的系统库）
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+
+      # 步骤4：安装 npm 依赖
+      - name: 安装项目依赖
+        run: |
+          npm config set registry https://registry.npmmirror.com   # 切换淘宝源加速
+          npm install puppeteer node-schedule fs-extra  # 安装依赖
+
+      # 步骤5：执行自动评论脚本
+      - name: 运行评论脚本
+        env:
+          # 从 GitHub Secrets 中读取敏感信息，注入环境变量
+          XHH_USERNAME: ${{ secrets.XHH_USERNAME }}
+          XHH_PASSWORD: ${{ secrets.XHH_PASSWORD }}
+        run: node xiaoheihe-auto-comment.js  # 执行脚本
