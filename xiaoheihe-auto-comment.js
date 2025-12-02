@@ -35,8 +35,10 @@ const CONFIG = {
     pwdInput: "input[type='password'], input[placeholder*='密码']",
     submitLogin: "button[type='submit'], button[class*='login'], button[class*='submit']",
     postList: "div[class*='feed'], div[class*='post']",
-    commentInput: "textarea[placeholder*='说点什么'], textarea[placeholder*='评论']",
-    sendCommentBtn: "button[class*='send'], button[class*='comment']",
+    // 用户提供的准确CSS选择器（首选）
+    // 注意：评论框默认是折叠状态，需要先点击展开
+    commentInput: "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.collapse.link-comment__reply > div > div.link-reply__input-wrapper",
+    sendCommentBtn: "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.expand.link-comment__reply > div > div > div.link-reply__menu-box > button.link-reply__menu-btn.hb-color__btn--confirm",
     closePopup: "div[class*='close'], button[class*='close'], svg[class*='close']"
   },
   // Puppeteer 配置（适配 GitHub Actions 无头环境）
@@ -913,33 +915,33 @@ async function selectRandomPost(page) {
   
   try {
     // 等待帖子元素可见
-    await page.waitForSelector(userPostSelector, { timeout: 15000 });
+    await page.waitForSelector(userPostSelector, { timeout: 15000, state: 'visible' });
     
-    // 查找帖子元素
-    const postElement = await page.$(userPostSelector);
+    // 优化：直接使用page.click()方法，它内部会重新查找元素，避免引用失效问题
+    // 先滚动到元素位置
+    await page.evaluate(selector => {
+      const element = document.querySelector(selector);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, userPostSelector);
     
-    if (postElement) {
-      // 滚动到帖子位置
-      await postElement.scrollIntoView({ behavior: "smooth", block: "center" });
-      await page.waitForTimeout(2000);
-      
-      // 点击帖子
-      await postElement.click();
-      console.log(`已点击第 ${randomNum} 条帖子`);
-      
-      // 等待新标签页打开
-      await page.waitForTimeout(3000);
-      
-      // 切换到新标签页
-      const pages = await page.browser().pages();
-      const postPage = pages[pages.length - 1];
-      await postPage.bringToFront();
-      await postPage.waitForTimeout(5000);
-      
-      return postPage;
-    } else {
-      throw new Error("未找到帖子元素");
-    }
+    await page.waitForTimeout(2000);
+    
+    // 直接使用page.click()，避免元素引用失效
+    await page.click(userPostSelector);
+    console.log(`已点击第 ${randomNum} 条帖子`);
+    
+    // 等待新标签页打开
+    await page.waitForTimeout(3000);
+    
+    // 切换到新标签页
+    const pages = await page.browser().pages();
+    const postPage = pages[pages.length - 1];
+    await postPage.bringToFront();
+    await postPage.waitForTimeout(5000);
+    
+    return postPage;
   } catch (e) {
     console.error(`使用用户提供的选择器点击帖子失败：${e.message}`);
     console.log("尝试使用备用选择器...");
@@ -1031,8 +1033,11 @@ async function sendRandomComment(page) {
   console.log("已保存帖子页面截图");
   
   // 尝试多种评论输入框选择器
+  // 注意：评论框默认是折叠状态，需要先点击展开
   const commentInputSelectors = [
-    CONFIG.selectors.commentInput,
+    CONFIG.selectors.commentInput, // 用户提供的折叠状态评论框
+    "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.collapse.link-comment__reply > div > div.link-reply__input-wrapper",
+    "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.expand.link-comment__reply > div > div",
     "textarea[placeholder*='说点什么']",
     "textarea[placeholder*='评论']",
     "textarea[placeholder*='写下你的评论']",
@@ -1060,6 +1065,23 @@ async function sendRandomComment(page) {
   ];
 
   let commentInput = null;
+  
+  // 首先尝试处理评论框的折叠/展开状态
+  console.log("正在处理评论框的折叠/展开状态...");
+  
+  // 1. 先尝试点击折叠状态的评论框，展开它
+  try {
+    const collapseSelector = CONFIG.selectors.commentInput;
+    console.log(`尝试点击折叠状态的评论框：${collapseSelector}`);
+    await page.click(collapseSelector);
+    console.log("已点击折叠状态的评论框，评论框已展开");
+    await page.waitForTimeout(2000); // 等待评论框展开
+  } catch (e) {
+    console.log(`点击折叠状态评论框失败：${e.message}`);
+  }
+  
+  // 2. 查找展开后的评论输入框
+  console.log("正在查找展开后的评论输入框...");
   
   // 首先尝试快速查找，不等待
   for (const selector of commentInputSelectors) {
@@ -1326,14 +1348,7 @@ async function autoCommentTask() {
       console.log("点击社区链接失败：", e.message);
     }
 
-    // 加载帖子
-    const postCount = await loadMorePosts(page, 50);
-    if (postCount < 10) {
-      console.log(`仅加载到 ${postCount} 条帖子，尝试继续执行...`);
-      // 不抛出异常，尝试继续执行
-    }
-
-    // 随机选帖 + 发送评论
+    // 随机选帖 + 发送评论（直接使用用户提供的CSS选择器，跳过帖子加载流程）
     const postPage = await selectRandomPost(page);
     await sendRandomComment(postPage);
 
