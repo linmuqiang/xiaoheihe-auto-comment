@@ -1212,13 +1212,23 @@ async function autoCommentTask() {
 
   try {
     // 启动浏览器（适配本地环境和 CI 环境）
+    // 在 GitHub Actions 环境中使用无头模式，本地环境使用有头模式
+    const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+    
     browser = await puppeteer.launch({
       ...CONFIG.browserOptions,
-      headless: false, // 本地运行时改为有头模式，方便调试
+      headless: isCI ? "new" : false, // CI环境使用无头模式，本地使用有头模式
       args: [
         ...CONFIG.browserOptions.args,
+        "--no-sandbox", // CI环境必需
+        "--disable-setuid-sandbox", // CI环境必需
+        "--disable-gpu", // 禁用GPU加速
+        "--disable-dev-shm-usage", // 避免共享内存问题
         "--window-size=1920,1080",
-        "--disable-blink-features=AutomationControlled"
+        "--disable-blink-features=AutomationControlled",
+        "--ozone-platform=wayland", // 解决X服务器问题
+        "--enable-features=UseOzonePlatform",
+        "--ozone-platform-hint=wayland"
       ]
     });
     const page = await browser.newPage();
