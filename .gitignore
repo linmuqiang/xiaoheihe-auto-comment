@@ -4,6 +4,13 @@ node_modules/
 xhh-cookie.json
 .env
 
+# 截图和HTML文件（测试生成）
+*.png
+*.html
+*.jpg
+*.jpeg
+*.gif
+
 # 其他常见的忽略项
 .DS_Store
 Thumbs.db

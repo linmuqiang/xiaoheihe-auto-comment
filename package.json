@@ -1,0 +1,17 @@
+{
+  "name": "xiaoheihe-auto-comment",
+  "version": "1.0.0",
+  "description": "小黑盒自动评论脚本",
+  "main": "xiaoheihe-auto-comment.js",
+  "scripts": {
+    "start": "node xiaoheihe-auto-comment.js"
+  },
+  "dependencies": {
+    "puppeteer": "^21.0.0",
+    "node-schedule": "^2.1.0",
+    "fs-extra": "^11.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
