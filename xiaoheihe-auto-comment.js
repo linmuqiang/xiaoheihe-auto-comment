@@ -902,75 +902,115 @@ async function loadMorePosts(page, count = 30) {
 async function selectRandomPost(page) {
   console.log("正在随机选择帖子...");
   
-  // 使用用户提供的帖子选择器模式
-  const userPostSelectorPattern = "a:nth-child(%d) > div.bbs-content__title";
+  // 生成1-10之间的随机数
+  const randomNum = Math.floor(Math.random() * 10) + 1;
+  console.log(`生成随机数：${randomNum}`);
   
-  // 首先使用loadMorePosts中成功加载51条帖子的选择器
-  const mainPostSelector = "div[class*='list'] div[class*='item']";
-  let posts = await page.$$(mainPostSelector);
+  // 使用用户提供的CSS选择器，将nth-child的数字替换为随机数
+  const userPostSelector = `#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.hb-cpt__scroll-list.bbs-home__content-list > a:nth-child(${randomNum}) > div.bbs-content__title`;
   
-  console.log(`使用主选择器 "${mainPostSelector}" 找到 ${posts.length} 条帖子`);
+  console.log(`使用用户提供的CSS选择器：${userPostSelector}`);
   
-  // 如果主选择器失败，尝试其他选择器
-  if (posts.length === 0) {
-    // 使用与loadMorePosts相同的帖子选择器
-    const postSelectors = [
-      CONFIG.selectors.postList,
-      "div[class*='feed-item']",
-      "div[class*='post-item']",
-      "div[class*='bbs-item']",
-      "div[class*='article']",
-      "div[class*='content-item']",
-      ".feed-item",
-      ".post-item",
-      ".bbs-item",
-      "article",
-      "section[class*='feed']",
-      "a[class*='bbs-content']",
-      ".bbs-home__content-list a",
-      "#hb-website div.bbs-home__content-list a"
-    ];
+  try {
+    // 等待帖子元素可见
+    await page.waitForSelector(userPostSelector, { timeout: 15000 });
     
-    for (const selector of postSelectors) {
-      const foundPosts = await page.$$(selector);
-      if (foundPosts.length > 0) {
-        posts = foundPosts;
-        console.log(`使用选择器 "${selector}" 找到 ${posts.length} 条帖子`);
-        break;
+    // 查找帖子元素
+    const postElement = await page.$(userPostSelector);
+    
+    if (postElement) {
+      // 滚动到帖子位置
+      await postElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      await page.waitForTimeout(2000);
+      
+      // 点击帖子
+      await postElement.click();
+      console.log(`已点击第 ${randomNum} 条帖子`);
+      
+      // 等待新标签页打开
+      await page.waitForTimeout(3000);
+      
+      // 切换到新标签页
+      const pages = await page.browser().pages();
+      const postPage = pages[pages.length - 1];
+      await postPage.bringToFront();
+      await postPage.waitForTimeout(5000);
+      
+      return postPage;
+    } else {
+      throw new Error("未找到帖子元素");
+    }
+  } catch (e) {
+    console.error(`使用用户提供的选择器点击帖子失败：${e.message}`);
+    console.log("尝试使用备用选择器...");
+    
+    // 备用方案：使用原有的帖子选择逻辑
+    // 首先使用loadMorePosts中成功加载51条帖子的选择器
+    const mainPostSelector = "div[class*='list'] div[class*='item']";
+    let posts = await page.$$(mainPostSelector);
+    
+    console.log(`使用主选择器 "${mainPostSelector}" 找到 ${posts.length} 条帖子`);
+    
+    // 如果主选择器失败，尝试其他选择器
+    if (posts.length === 0) {
+      // 使用与loadMorePosts相同的帖子选择器
+      const postSelectors = [
+        CONFIG.selectors.postList,
+        "div[class*='feed-item']",
+        "div[class*='post-item']",
+        "div[class*='bbs-item']",
+        "div[class*='article']",
+        "div[class*='content-item']",
+        ".feed-item",
+        ".post-item",
+        ".bbs-item",
+        "article",
+        "section[class*='feed']",
+        "a[class*='bbs-content']",
+        ".bbs-home__content-list a",
+        "#hb-website div.bbs-home__content-list a"
+      ];
+      
+      for (const selector of postSelectors) {
+        const foundPosts = await page.$$(selector);
+        if (foundPosts.length > 0) {
+          posts = foundPosts;
+          console.log(`使用选择器 "${selector}" 找到 ${posts.length} 条帖子`);
+          break;
+        }
       }
     }
+    
+    if (posts.length === 0) throw new Error("未加载到任何帖子");
+
+    // 随机选择一条帖子，在1-10范围内
+    const randomIndex = Math.min(randomNum - 1, posts.length - 1);
+    const selectedPost = posts[randomIndex];
+
+    await selectedPost.scrollIntoView({ behavior: "smooth", block: "center" });
+    await page.waitForTimeout(2000);
+    
+    // 点击帖子
+    try {
+      await selectedPost.click();
+      console.log(`已随机选择第 ${randomIndex + 1} 条帖子`);
+    } catch (e) {
+      console.log(`直接点击帖子失败，尝试使用JavaScript点击...`);
+      await page.evaluate(el => el.click(), selectedPost);
+      console.log(`已使用JavaScript随机选择第 ${randomIndex + 1} 条帖子`);
+    }
+
+    // 等待新标签页打开
+    await page.waitForTimeout(3000);
+    
+    // 切换到新标签页
+    const pages = await page.browser().pages();
+    const postPage = pages[pages.length - 1];
+    await postPage.bringToFront();
+    await postPage.waitForTimeout(5000);
+
+    return postPage;
   }
-  
-  if (posts.length === 0) throw new Error("未加载到任何帖子");
-
-  // 随机选择一条帖子，排除前3条可能的置顶帖
-  const maxIndex = Math.max(0, posts.length - 3);
-  const randomIndex = Math.floor(Math.random() * maxIndex) + Math.min(3, posts.length - 1);
-  const selectedPost = posts[randomIndex];
-
-  await selectedPost.scrollIntoView({ behavior: "smooth", block: "center" });
-  await page.waitForTimeout(2000);
-  
-  // 点击帖子
-  try {
-    await selectedPost.click();
-    console.log(`已随机选择第 ${randomIndex + 1} 条帖子`);
-  } catch (e) {
-    console.log(`直接点击帖子失败，尝试使用JavaScript点击...`);
-    await page.evaluate(el => el.click(), selectedPost);
-    console.log(`已使用JavaScript随机选择第 ${randomIndex + 1} 条帖子`);
-  }
-
-  // 等待新标签页打开
-  await page.waitForTimeout(3000);
-  
-  // 切换到新标签页
-  const pages = await page.browser().pages();
-  const postPage = pages[pages.length - 1];
-  await postPage.bringToFront();
-  await postPage.waitForTimeout(5000);
-
-  return postPage;
 }
 
 /**
