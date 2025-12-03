@@ -42,4 +42,5 @@ jobs:
           # 从 GitHub Secrets 中读取敏感信息，注入环境变量
           XHH_USERNAME: ${{ secrets.XHH_USERNAME }}
           XHH_PASSWORD: ${{ secrets.XHH_PASSWORD }}
+          XHH_COOKIES: ${{ secrets.XHH_COOKIES }}
         run: node xiaoheihe-auto-comment.js  # 执行脚本

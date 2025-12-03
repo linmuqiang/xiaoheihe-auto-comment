@@ -24,4 +24,6 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
-*~# Cookies文件\nxiaoheihe-cookies.json
+*~
+# Cookies文件
+xiaoheihe-cookies.json
