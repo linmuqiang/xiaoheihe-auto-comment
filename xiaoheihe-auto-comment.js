@@ -11,6 +11,9 @@ const CONFIG = {
   // 用户账号密码（本地运行时使用硬编码，GitHub Actions 从环境变量读取）
   username: process.env.XHH_USERNAME || "19939162027",
   password: process.env.XHH_PASSWORD || "Fu134679",
+  // Cookies配置
+  useCookies: true, // 是否使用cookies登录
+  cookiesFilePath: "./xiaoheihe-cookies.json", // cookies保存路径
   // 定时任务配置（支持多个时间点）
   scheduleConfig: [
     "0 8 * * *", // 每天早上8点
@@ -59,10 +62,106 @@ const CONFIG = {
 
 // ==================== 工具函数 ====================
 /**
- * 小黑盒登录逻辑（每次运行重新登录，适配 CI 无 Cookie 环境）
+ * 保存cookies到文件
+ */
+async function saveCookies(page, filePath) {
+  try {
+    const cookies = await page.cookies();
+    await fs.writeJSON(filePath, cookies, { spaces: 2 });
+    console.log(`已成功保存cookies到 ${filePath}`);
+    return true;
+  } catch (error) {
+    console.error(`保存cookies失败：${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 从文件加载cookies
+ */
+async function loadCookies(page, filePath) {
+  try {
+    if (!await fs.pathExists(filePath)) {
+      console.log(`cookies文件 ${filePath} 不存在`);
+      return false;
+    }
+    
+    const cookies = await fs.readJSON(filePath);
+    if (!cookies || cookies.length === 0) {
+      console.log("cookies文件内容为空");
+      return false;
+    }
+    
+    await page.setCookie(...cookies);
+    console.log(`已成功从 ${filePath} 加载cookies`);
+    return true;
+  } catch (error) {
+    console.error(`加载cookies失败：${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 验证cookies是否有效
+ */
+async function validateCookies(page) {
+  try {
+    // 访问小黑盒首页，检查是否已登录
+    await page.goto("https://www.xiaoheihe.cn/home", {
+      waitUntil: ["networkidle2", "domcontentloaded"],
+      timeout: 60000
+    });
+    
+    await page.waitForTimeout(3000);
+    
+    // 检查当前URL是否包含登录标识
+    const currentUrl = page.url();
+    if (currentUrl.includes("/bbs/home") || currentUrl.includes("/app/bbs") || currentUrl.includes("/user")) {
+      console.log("cookies有效，已成功登录");
+      return true;
+    }
+    
+    // 检查页面是否有用户信息或登录成功标识
+    const hasUserInfo = await page.evaluate(() => {
+      return !!document.querySelector(".user-info, .user-avatar, [class*='user']");
+    });
+    
+    if (hasUserInfo) {
+      console.log("cookies有效，已成功登录");
+      return true;
+    }
+    
+    console.log("cookies无效，需要重新登录");
+    return false;
+  } catch (error) {
+    console.error(`验证cookies失败：${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 小黑盒登录逻辑（优先使用cookies登录，失败则使用账号密码登录）
  */
 async function login(page) {
+  // 优先尝试使用cookies登录
+  if (CONFIG.useCookies) {
+    console.log("正在尝试使用cookies登录...");
+    
+    // 1. 从文件加载cookies
+    const loaded = await loadCookies(page, CONFIG.cookiesFilePath);
+    if (loaded) {
+      // 2. 验证cookies是否有效
+      const isValid = await validateCookies(page);
+      if (isValid) {
+        return true;
+      }
+    }
+    
+    console.log("cookies登录失败，将使用账号密码登录");
+  }
+  
   try {
+    // 使用账号密码登录
     // 使用指定的登录链接
     const loginUrl = "https://login.xiaoheihe.cn/"; // 小黑盒官方登录页面
     await page.goto(loginUrl, {
@@ -769,6 +868,11 @@ async function login(page) {
       }
     } catch (e) {
       console.log("错误提示检测失败");
+    }
+    
+    // 登录成功，保存cookies
+    if (CONFIG.useCookies) {
+      await saveCookies(page, CONFIG.cookiesFilePath);
     }
     
     if (page.url().includes("/bbs/home") || page.url().includes("/app/bbs") || page.url().includes("/user")) {
