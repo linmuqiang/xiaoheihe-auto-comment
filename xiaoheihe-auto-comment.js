@@ -1508,11 +1508,27 @@ function scheduleTasks() {
 }
 
 // ==================== 启动脚本 ====================
-// 立即执行一次任务，验证配置是否正确
-console.log(`[${new Date().toLocaleString()}] 脚本启动，立即执行一次任务进行验证...`);
-autoCommentTask();
+// 检测是否在CI/CD环境中运行
+const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
-// 启动定时任务
-setTimeout(() => {
-  scheduleTasks();
-}, 30000); // 30秒后启动定时任务，避免与立即执行的任务冲突
+if (isCI) {
+  // 在CI/CD环境中（如GitHub Actions），只执行一次任务
+  console.log(`[${new Date().toLocaleString()}] 在CI/CD环境中运行，只执行一次任务...`);
+  autoCommentTask().then(() => {
+    console.log(`[${new Date().toLocaleString()}] 任务执行完成，脚本退出`);
+    // 任务完成后退出进程
+    process.exit(0);
+  }).catch((error) => {
+    console.error(`[${new Date().toLocaleString()}] 任务执行失败：`, error.message);
+    process.exit(1);
+  });
+} else {
+  // 在本地环境中，执行一次任务并启动定时服务
+  console.log(`[${new Date().toLocaleString()}] 脚本启动，立即执行一次任务进行验证...`);
+  autoCommentTask();
+  
+  // 启动定时任务
+  setTimeout(() => {
+    scheduleTasks();
+  }, 30000); // 30秒后启动定时任务，避免与立即执行的任务冲突
+}
