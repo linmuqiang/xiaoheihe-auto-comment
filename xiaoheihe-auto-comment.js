@@ -77,10 +77,26 @@ async function saveCookies(page, filePath) {
 }
 
 /**
- * 从文件加载cookies
+ * 从文件或环境变量加载cookies
  */
 async function loadCookies(page, filePath) {
   try {
+    // 1. 首先尝试从环境变量读取cookies（GitHub Actions使用）
+    const cookiesEnv = process.env.XHH_COOKIES;
+    if (cookiesEnv) {
+      console.log("正在从环境变量加载cookies...");
+      try {
+        const cookies = JSON.parse(cookiesEnv);
+        await page.setCookie(...cookies);
+        console.log("已成功从环境变量加载cookies");
+        return true;
+      } catch (e) {
+        console.error("环境变量cookies格式错误：", e.message);
+        // 继续尝试从文件加载
+      }
+    }
+    
+    // 2. 环境变量不存在或格式错误时，尝试从文件加载
     if (!await fs.pathExists(filePath)) {
       console.log(`cookies文件 ${filePath} 不存在`);
       return false;
