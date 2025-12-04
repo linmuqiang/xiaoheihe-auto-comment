@@ -23,14 +23,7 @@ const CONFIG = {
   executeTime: "08:00", // 北京时间
   // 评论内容库（可自定义扩展）
   commentLib: [
-    "哈哈，这个内容太有意思了！",
-    "支持一下，分析得很到位～",
-    "学到了，感谢分享！",
-    "有点东西，马克一下",
-    "确实不错，值得一看！",
-    "太真实了，我也这么觉得",
-    "求链接/资源！",
-    "已三连，持续关注～"
+    "666",
   ],
   // 小黑盒 DOM 选择器（已适配最新版，若失效需重新获取）
   selectors: {
@@ -38,11 +31,29 @@ const CONFIG = {
     pwdInput: "input[type='password'], input[placeholder*='密码']",
     submitLogin: "button[type='submit'], button[class*='login'], button[class*='submit']",
     postList: "div[class*='feed'], div[class*='post']",
+    communityLink: "#app > div.header.add-border.color-opacity-white.position-top > div > div.nav-wrapper > div > ul > li:nth-child(2) > a", // 社区链接
     // 用户提供的准确CSS选择器（首选）
     // 注意：评论框默认是折叠状态，需要先点击展开
     commentInput: "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.collapse.link-comment__reply > div > div.link-reply__input-wrapper",
     sendCommentBtn: "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.expand.link-comment__reply > div > div > div.link-reply__menu-box > button.link-reply__menu-btn.hb-color__btn--confirm",
     closePopup: "div[class*='close'], button[class*='close'], svg[class*='close']"
+  },
+  // 评论配置
+  commentConfig: {
+    minPostIndex: 1, // 最小帖子索引
+    maxPostIndex: 10, // 最大帖子索引
+    inputDelay: 100, // 输入延迟（毫秒）
+    focusDelay: 500, // 聚焦延迟（毫秒）
+    charTypeDelay: { min: 40, max: 120 }, // 字符输入延迟范围（毫秒）
+    sendDelay: 3000 // 发送后等待时间（毫秒）
+  },
+  // 页面加载配置
+  pageConfig: {
+    navigationTimeout: 60000, // 页面导航超时时间（毫秒）
+    loadMoreAttempts: 15, // 加载更多帖子的最大尝试次数
+    loadMoreInterval: 4000, // 加载更多帖子的等待时间（毫秒）
+    refreshInterval: 5, // 刷新页面的尝试间隔
+    commentScreenshot: true // 是否保存评论页面截图
   },
   // Puppeteer 配置（适配 GitHub Actions 无头环境）
   browserOptions: {
@@ -125,7 +136,7 @@ async function validateCookies(page) {
     // 访问小黑盒首页，检查是否已登录
     await page.goto("https://www.xiaoheihe.cn/home", {
       waitUntil: ["networkidle2", "domcontentloaded"],
-      timeout: 60000
+      timeout: CONFIG.pageConfig.navigationTimeout
     });
     
     await page.waitForTimeout(3000);
@@ -151,6 +162,217 @@ async function validateCookies(page) {
     return false;
   } catch (error) {
     console.error(`验证cookies失败：${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * 查找并点击密码登录选项
+ */
+async function findAndClickPasswordLogin(page) {
+  console.log("正在查找密码登录选项...");
+  
+  // 方式1：使用用户提供的准确CSS选择器
+  const userProvidedSelector = "#app > div > div.main > div.login-container > div > div.bottom-bar > div.btn.left-btn > span";
+  let passwordLoginBtn = null;
+  
+  try {
+    passwordLoginBtn = await page.$(userProvidedSelector);
+    if (passwordLoginBtn) {
+      console.log(`使用用户提供的CSS选择器找到密码登录选项：${userProvidedSelector}`);
+    }
+  } catch (e) {
+    console.log(`用户提供的选择器查找失败：`, e.message);
+  }
+  
+  // 方式2：如果用户提供的选择器失败，使用通用选择器查找
+  if (!passwordLoginBtn) {
+    console.log("用户提供的选择器失败，尝试使用通用选择器查找...");
+    const passwordLoginSelectors = [
+      ".left-btn",
+      ".btn.left-btn",
+      "[class*='left'][class*='btn']",
+      "div.bottom-bar div.btn:first-child",
+      "span:contains('密码登录')",
+      "a[class*='password']",
+      "a[class*='pwd']",
+      ".password-login",
+      ".pwd-login"
+    ];
+    
+    for (const selector of passwordLoginSelectors) {
+      try {
+        const elements = await page.$$(selector);
+        for (const element of elements) {
+          try {
+            // 检查元素是否可见
+            const isVisible = await page.evaluate(el => {
+              const style = window.getComputedStyle(el);
+              return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            }, element);
+            
+            if (isVisible) {
+              passwordLoginBtn = element;
+              console.log(`找到密码登录选项：${selector}`);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+        
+        if (passwordLoginBtn) break;
+      } catch (e) {
+        console.log(`尝试查找${selector}失败：`, e.message);
+        continue;
+      }
+    }
+  }
+  
+  // 方式3：如果通用选择器失败，使用JavaScript查找包含特定文本的可点击元素
+  if (!passwordLoginBtn) {
+    console.log("通用选择器失败，尝试使用JavaScript查找包含特定文本的可点击元素...");
+    
+    const passwordLoginText = ["密码登录", "密码", "PWD", "password"];
+    
+    for (const text of passwordLoginText) {
+      try {
+        const elementHandle = await page.evaluateHandle((targetText) => {
+          // 查找所有可能的可点击元素
+          const elements = document.querySelectorAll('a, button, div[role="button"], span[role="button"], li[role="button"]');
+          
+          for (const element of elements) {
+            // 检查元素文本是否包含目标文本
+            if (element.textContent && element.textContent.includes(targetText)) {
+              // 检查元素是否可见
+              const style = window.getComputedStyle(element);
+              if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                // 检查元素是否可点击
+                if (element.tagName === 'A' || element.tagName === 'BUTTON' || element.hasAttribute('role') || element.style.cursor === 'pointer') {
+                  return element;
+                }
+              }
+            }
+          }
+          
+          return null;
+        }, text);
+        
+        // 检查是否找到元素
+        const isFound = await page.evaluate(el => el !== null, elementHandle);
+        if (isFound) {
+          passwordLoginBtn = elementHandle;
+          console.log(`通过JavaScript找到包含"${text}"的可点击元素`);
+          break;
+        }
+      } catch (e) {
+        console.log(`JavaScript查找"${text}"失败：`, e.message);
+        continue;
+      }
+    }
+  }
+  
+  // 方式4：如果还是没找到，尝试使用JavaScript直接执行点击操作
+  if (!passwordLoginBtn) {
+    console.log("尝试使用JavaScript直接执行点击操作...");
+    
+    try {
+      const isClicked = await page.evaluate(() => {
+        // 查找所有包含"密码登录"文本的元素的父元素
+        const elements = document.querySelectorAll('a, span, div, button');
+        
+        for (const element of elements) {
+          if (element.textContent && element.textContent.includes('密码登录')) {
+            // 找到可点击的父元素或祖先元素
+            let clickableElement = element;
+            
+            // 向上查找可点击的元素
+            for (let i = 0; i < 5 && clickableElement; i++) {
+              if (clickableElement.tagName === 'A' || 
+                  clickableElement.tagName === 'BUTTON' || 
+                  clickableElement.hasAttribute('role') || 
+                  clickableElement.style.cursor === 'pointer') {
+                // 执行点击
+                clickableElement.click();
+                return true;
+              }
+              clickableElement = clickableElement.parentElement;
+            }
+          }
+        }
+        
+        return false;
+      });
+      
+      if (isClicked) {
+        console.log("通过JavaScript直接执行点击操作成功");
+        await page.waitForTimeout(3000); // 等待切换完成
+        return true;
+      } else {
+        console.log("JavaScript直接点击失败");
+      }
+    } catch (e) {
+      console.log("JavaScript直接点击异常：", e.message);
+    }
+  }
+  
+  // 方式5：尝试点击登录页面的其他位置，可能触发密码登录选项显示
+  if (!passwordLoginBtn) {
+    console.log("尝试点击登录页面其他位置...");
+    try {
+      // 点击页面右上角的切换图标
+      const switchIcons = await page.$$("svg, i[class*='icon'], [class*='toggle'], [class*='switch']");
+      for (const icon of switchIcons) {
+        try {
+          await icon.click();
+          console.log("已点击切换图标");
+          await page.waitForTimeout(2000);
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+    } catch (e) {
+      console.log("点击切换图标失败：", e.message);
+    }
+  }
+  
+  // 如果找到密码登录按钮，使用多种方式尝试点击
+  if (passwordLoginBtn) {
+    try {
+      console.log("尝试点击密码登录选项...");
+      
+      // 方式1：直接点击
+      try {
+        await passwordLoginBtn.click();
+        console.log("方式1：直接点击成功");
+      } catch (e1) {
+        console.log("方式1：直接点击失败，尝试方式2...");
+        
+        // 方式2：滚动到可见区域后点击
+        await passwordLoginBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+        await page.waitForTimeout(1000);
+        
+        try {
+          await passwordLoginBtn.click();
+          console.log("方式2：滚动后点击成功");
+        } catch (e2) {
+          console.log("方式2：滚动后点击失败，尝试方式3...");
+          
+          // 方式3：使用JavaScript点击
+          await page.evaluate(el => el.click(), passwordLoginBtn);
+          console.log("方式3：JavaScript点击成功");
+        }
+      }
+      
+      await page.waitForTimeout(3000); // 等待切换完成
+      return true;
+    } catch (e) {
+      console.log("点击密码登录选项最终失败：", e.message);
+      return false;
+    }
+  } else {
+    console.log("未找到密码登录选项，继续执行...");
     return false;
   }
 }
@@ -182,7 +404,7 @@ async function login(page) {
     const loginUrl = "https://login.xiaoheihe.cn/"; // 小黑盒官方登录页面
     await page.goto(loginUrl, {
       waitUntil: ["networkidle2", "domcontentloaded"],
-      timeout: 60000
+      timeout: CONFIG.pageConfig.navigationTimeout
     });
     
     console.log("已进入登录页面");
@@ -200,207 +422,7 @@ async function login(page) {
     }
     
     // 查找并点击密码登录选项
-    console.log("正在查找密码登录选项...");
-    
-    // 方式1：使用用户提供的准确CSS选择器
-    const userProvidedSelector = "#app > div > div.main > div.login-container > div > div.bottom-bar > div.btn.left-btn > span";
-    let passwordLoginBtn = null;
-    
-    try {
-      passwordLoginBtn = await page.$(userProvidedSelector);
-      if (passwordLoginBtn) {
-        console.log(`使用用户提供的CSS选择器找到密码登录选项：${userProvidedSelector}`);
-      }
-    } catch (e) {
-      console.log(`用户提供的选择器查找失败：`, e.message);
-    }
-    
-    // 方式2：如果用户提供的选择器失败，使用通用选择器查找
-    if (!passwordLoginBtn) {
-      console.log("用户提供的选择器失败，尝试使用通用选择器查找...");
-      const passwordLoginSelectors = [
-        ".left-btn",
-        ".btn.left-btn",
-        "[class*='left'][class*='btn']",
-        "div.bottom-bar div.btn:first-child",
-        "span:contains('密码登录')",
-        "a[class*='password']",
-        "a[class*='pwd']",
-        ".password-login",
-        ".pwd-login"
-      ];
-      
-      for (const selector of passwordLoginSelectors) {
-        try {
-          const elements = await page.$$(selector);
-          for (const element of elements) {
-            try {
-              // 检查元素是否可见
-              const isVisible = await page.evaluate(el => {
-                const style = window.getComputedStyle(el);
-                return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-              }, element);
-              
-              if (isVisible) {
-                passwordLoginBtn = element;
-                console.log(`找到密码登录选项：${selector}`);
-                break;
-              }
-            } catch (e) {
-              continue;
-            }
-          }
-          
-          if (passwordLoginBtn) break;
-        } catch (e) {
-          console.log(`尝试查找${selector}失败：`, e.message);
-          continue;
-        }
-      }
-    }
-    
-    // 方式2：如果通用选择器失败，使用JavaScript查找包含特定文本的可点击元素
-    if (!passwordLoginBtn) {
-      console.log("通用选择器失败，尝试使用JavaScript查找包含特定文本的可点击元素...");
-      
-      const passwordLoginText = ["密码登录", "密码", "PWD", "password"];
-      
-      for (const text of passwordLoginText) {
-        try {
-          const elementHandle = await page.evaluateHandle((targetText) => {
-            // 查找所有可能的可点击元素
-            const elements = document.querySelectorAll('a, button, div[role="button"], span[role="button"], li[role="button"]');
-            
-            for (const element of elements) {
-              // 检查元素文本是否包含目标文本
-              if (element.textContent && element.textContent.includes(targetText)) {
-                // 检查元素是否可见
-                const style = window.getComputedStyle(element);
-                if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
-                  // 检查元素是否可点击
-                  if (element.tagName === 'A' || element.tagName === 'BUTTON' || element.hasAttribute('role') || element.style.cursor === 'pointer') {
-                    return element;
-                  }
-                }
-              }
-            }
-            
-            return null;
-          }, text);
-          
-          // 检查是否找到元素
-          const isFound = await page.evaluate(el => el !== null, elementHandle);
-          if (isFound) {
-            passwordLoginBtn = elementHandle;
-            console.log(`通过JavaScript找到包含"${text}"的可点击元素`);
-            break;
-          }
-        } catch (e) {
-          console.log(`JavaScript查找"${text}"失败：`, e.message);
-          continue;
-        }
-      }
-    }
-    
-    // 方式3：如果还是没找到，尝试使用JavaScript直接执行点击操作
-    if (!passwordLoginBtn) {
-      console.log("尝试使用JavaScript直接执行点击操作...");
-      
-      try {
-        const isClicked = await page.evaluate(() => {
-          // 查找所有包含"密码登录"文本的元素的父元素
-          const elements = document.querySelectorAll('a, span, div, button');
-          
-          for (const element of elements) {
-            if (element.textContent && element.textContent.includes('密码登录')) {
-              // 找到可点击的父元素或祖先元素
-              let clickableElement = element;
-              
-              // 向上查找可点击的元素
-              for (let i = 0; i < 5 && clickableElement; i++) {
-                if (clickableElement.tagName === 'A' || 
-                    clickableElement.tagName === 'BUTTON' || 
-                    clickableElement.hasAttribute('role') || 
-                    clickableElement.style.cursor === 'pointer') {
-                  // 执行点击
-                  clickableElement.click();
-                  return true;
-                }
-                clickableElement = clickableElement.parentElement;
-              }
-            }
-          }
-          
-          return false;
-        });
-        
-        if (isClicked) {
-          console.log("通过JavaScript直接执行点击操作成功");
-          await page.waitForTimeout(3000); // 等待切换完成
-        } else {
-          console.log("JavaScript直接点击失败");
-        }
-      } catch (e) {
-        console.log("JavaScript直接点击异常：", e.message);
-      }
-    }
-    
-    // 方式4：尝试点击登录页面的其他位置，可能触发密码登录选项显示
-    if (!passwordLoginBtn) {
-      console.log("尝试点击登录页面其他位置...");
-      try {
-        // 点击页面右上角的切换图标
-        const switchIcons = await page.$$("svg, i[class*='icon'], [class*='toggle'], [class*='switch']");
-        for (const icon of switchIcons) {
-          try {
-            await icon.click();
-            console.log("已点击切换图标");
-            await page.waitForTimeout(2000);
-            break;
-          } catch (e) {
-            continue;
-          }
-        }
-      } catch (e) {
-        console.log("点击切换图标失败：", e.message);
-      }
-    }
-    
-    // 如果找到密码登录按钮，使用多种方式尝试点击
-    if (passwordLoginBtn) {
-      try {
-        console.log("尝试点击密码登录选项...");
-        
-        // 方式1：直接点击
-        try {
-          await passwordLoginBtn.click();
-          console.log("方式1：直接点击成功");
-        } catch (e1) {
-          console.log("方式1：直接点击失败，尝试方式2...");
-          
-          // 方式2：滚动到可见区域后点击
-          await passwordLoginBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-          await page.waitForTimeout(1000);
-          
-          try {
-            await passwordLoginBtn.click();
-            console.log("方式2：滚动后点击成功");
-          } catch (e2) {
-            console.log("方式2：滚动后点击失败，尝试方式3...");
-            
-            // 方式3：使用JavaScript点击
-            await page.evaluate(el => el.click(), passwordLoginBtn);
-            console.log("方式3：JavaScript点击成功");
-          }
-        }
-        
-        await page.waitForTimeout(3000); // 等待切换完成
-      } catch (e) {
-        console.log("点击密码登录选项最终失败：", e.message);
-      }
-    } else {
-      console.log("未找到密码登录选项，继续执行...");
-    }
+    await findAndClickPasswordLogin(page);
 
     // 关闭可能的弹窗
     try {
@@ -733,7 +755,7 @@ async function login(page) {
         try {
           loginBtn = await page.waitForSelector(selector, { timeout: 3000 });
           loginSelector = selector;
-          console.log(`等待查找找到登录按钮：${selector}`);
+          console.log(`等待找到登录按钮：${selector}`);
           break;
         } catch (e) {
           continue;
@@ -848,7 +870,7 @@ async function login(page) {
     try {
       await page.waitForNavigation({ 
         waitUntil: ["networkidle2", "domcontentloaded"], 
-        timeout: 60000 
+        timeout: CONFIG.pageConfig.navigationTimeout 
       });
     } catch (e) {
       console.log("登录跳转超时，检查当前页面状态...");
@@ -927,7 +949,7 @@ async function loadMorePosts(page, count = 30) {
   console.log("正在加载帖子列表...");
   let loadedCount = 0;
   let scrollAttempts = 0;
-  const maxAttempts = 15;
+  const maxAttempts = CONFIG.pageConfig.loadMoreAttempts;
 
   // 先检查当前URL，确保在首页
   const currentUrl = page.url();
@@ -938,7 +960,7 @@ async function loadMorePosts(page, count = 30) {
     console.log("不在首页，跳转到首页...");
     await page.goto("https://www.xiaoheihe.cn/home", {
       waitUntil: ["networkidle2", "domcontentloaded"],
-      timeout: 60000
+      timeout: CONFIG.pageConfig.navigationTimeout
     });
     await page.waitForTimeout(3000);
   }
@@ -978,7 +1000,7 @@ async function loadMorePosts(page, count = 30) {
     await page.evaluate(() => {
       window.scrollTo(0, document.body.scrollHeight);
     });
-    await page.waitForTimeout(4000); // 延长等待时间，确保内容加载
+    await page.waitForTimeout(CONFIG.pageConfig.loadMoreInterval); // 延长等待时间，确保内容加载
     
     // 尝试点击可能的加载更多按钮
     try {
@@ -988,7 +1010,8 @@ async function loadMorePosts(page, count = 30) {
         "a[class*='load-more']",
         ".load-more-btn",
         "[class*='load-more']",
-        "[class*='more']:not([class*='comment']):not([class*='reply'])"
+        "[class*='more']:not([class*='comment']):not([class*='reply'])",
+        ".hb-load-more"
       ];
       
       for (const selector of loadMoreSelectors) {
@@ -1007,7 +1030,7 @@ async function loadMorePosts(page, count = 30) {
     scrollAttempts++;
     
     // 如果多次尝试后仍未加载到帖子，尝试重新刷新页面
-    if (scrollAttempts % 5 === 0 && loadedCount === 0) {
+    if (scrollAttempts % CONFIG.pageConfig.refreshInterval === 0 && loadedCount === 0) {
       console.log("多次尝试后仍未加载到帖子，尝试刷新页面...");
       await page.reload({ waitUntil: ["networkidle2", "domcontentloaded"] });
       await page.waitForTimeout(5000);
@@ -1024,8 +1047,8 @@ async function loadMorePosts(page, count = 30) {
 async function selectRandomPost(page) {
   console.log("正在随机选择帖子...");
   
-  // 生成1-10之间的随机数
-  const randomNum = Math.floor(Math.random() * 10) + 1;
+  // 生成随机数
+  const randomNum = Math.floor(Math.random() * (CONFIG.commentConfig.maxPostIndex - CONFIG.commentConfig.minPostIndex + 1)) + CONFIG.commentConfig.minPostIndex;
   console.log(`生成随机数：${randomNum}`);
   
   // 使用用户提供的CSS选择器，将nth-child的数字替换为随机数
@@ -1136,27 +1159,37 @@ async function selectRandomPost(page) {
 }
 
 /**
- * 发送随机评论
+ * 展开评论输入框
  */
-async function sendRandomComment(page) {
-  console.log("正在发送随机评论...");
+async function expandCommentInput(page) {
+  console.log("正在处理评论框的折叠/展开状态...");
   
-  const randomComment = CONFIG.commentLib[Math.floor(Math.random() * CONFIG.commentLib.length)];
-  console.log(`准备发送评论：${randomComment}`);
+  // 1. 先尝试点击折叠状态的评论框，展开它
+  try {
+    const collapseSelector = CONFIG.selectors.commentInput;
+    console.log(`尝试点击折叠状态的评论框：${collapseSelector}`);
+    await page.click(collapseSelector);
+    console.log("已点击折叠状态的评论框，评论框已展开");
+    await page.waitForTimeout(2000); // 等待评论框展开
+    return true;
+  } catch (e) {
+    console.log(`点击折叠状态评论框失败：${e.message}`);
+    return false;
+  }
+}
 
-  // 先检查当前页面URL
-  const currentUrl = page.url();
-  console.log(`当前帖子页面URL：${currentUrl}`);
-  
-  // 保存页面截图，便于调试
-  await page.screenshot({ path: `post-page-${Date.now()}.png` });
-  console.log("已保存帖子页面截图");
+/**
+ * 查找评论输入框
+ */
+async function findCommentInput(page) {
+  console.log("正在查找展开后的评论输入框...");
   
   // 尝试多种评论输入框选择器
-  // 注意：评论框默认是折叠状态，需要先点击展开
   const commentInputSelectors = [
     CONFIG.selectors.commentInput, // 用户提供的折叠状态评论框
     "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.collapse.link-comment__reply > div > div.link-reply__input-wrapper",
+    // 用户提供的新选择器：可编辑的p标签
+    "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.expand.link-comment__reply > div > div > div.link-reply__editor.link-reply__input > div > p",
     "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.expand.link-comment__reply > div > div",
     "textarea[placeholder*='说点什么']",
     "textarea[placeholder*='评论']",
@@ -1181,27 +1214,13 @@ async function sendRandomComment(page) {
     ".main textarea",
     ".content textarea",
     "section textarea",
-    "article textarea"
+    "article textarea",
+    // 支持contenteditable元素
+    "[contenteditable='true']",
+    ".link-reply__editor > div > p"
   ];
 
   let commentInput = null;
-  
-  // 首先尝试处理评论框的折叠/展开状态
-  console.log("正在处理评论框的折叠/展开状态...");
-  
-  // 1. 先尝试点击折叠状态的评论框，展开它
-  try {
-    const collapseSelector = CONFIG.selectors.commentInput;
-    console.log(`尝试点击折叠状态的评论框：${collapseSelector}`);
-    await page.click(collapseSelector);
-    console.log("已点击折叠状态的评论框，评论框已展开");
-    await page.waitForTimeout(2000); // 等待评论框展开
-  } catch (e) {
-    console.log(`点击折叠状态评论框失败：${e.message}`);
-  }
-  
-  // 2. 查找展开后的评论输入框
-  console.log("正在查找展开后的评论输入框...");
   
   // 首先尝试快速查找，不等待
   for (const selector of commentInputSelectors) {
@@ -1210,7 +1229,7 @@ async function sendRandomComment(page) {
       if (elements.length > 0) {
         commentInput = elements[0];
         console.log(`快速找到评论输入框：${selector}`);
-        break;
+        return commentInput;
       }
     } catch (e) {
       console.log(`快速查找${selector}失败：`, e.message);
@@ -1225,7 +1244,7 @@ async function sendRandomComment(page) {
       try {
         commentInput = await page.waitForSelector(selector, { timeout: 3000 });
         console.log(`等待找到评论输入框：${selector}`);
-        break;
+        return commentInput;
       } catch (e) {
         console.log(`等待查找${selector}失败：`, e.message);
         continue;
@@ -1239,11 +1258,12 @@ async function sendRandomComment(page) {
     try {
       // 先获取页面上所有的输入元素，保存到文件便于调试
       const inputElements = await page.evaluate(() => {
-        const elements = document.querySelectorAll('textarea, input[type="text"]');
+        const elements = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
         return Array.from(elements).map((el, index) => ({
           index,
           tagName: el.tagName,
           type: el.type,
+          isContentEditable: el.isContentEditable,
           placeholder: el.placeholder,
           className: el.className,
           id: el.id,
@@ -1254,62 +1274,89 @@ async function sendRandomComment(page) {
       
       console.log(`页面上找到 ${inputElements.length} 个输入元素`);
       inputElements.forEach(el => {
-        console.log(`  输入元素 ${el.index}：${el.tagName} ${el.type}，placeholder：${el.placeholder}，className：${el.className}，可见：${el.isVisible}`);
+        console.log(`  输入元素 ${el.index}：${el.tagName} ${el.type}，contenteditable: ${el.isContentEditable}，placeholder：${el.placeholder}，className：${el.className}，可见：${el.isVisible}`);
       });
       
       // 尝试找到可见的输入元素
       for (const el of inputElements) {
         if (el.isVisible) {
-          commentInput = await page.$$(el.tagName === 'TEXTAREA' ? 'textarea' : 'input[type="text"]');
-          commentInput = commentInput[el.index];
+          if (el.tagName === 'TEXTAREA' || el.type === 'text') {
+            commentInput = await page.$$(el.tagName === 'TEXTAREA' ? 'textarea' : 'input[type="text"]');
+            commentInput = commentInput[el.index];
+          } else if (el.isContentEditable) {
+            // 处理可编辑元素
+            const allContentEditable = await page.$$('[contenteditable="true"]');
+            commentInput = allContentEditable[el.index];
+          }
           console.log(`通过JavaScript找到可见的输入元素，索引：${el.index}`);
-          break;
+          return commentInput;
         }
       }
       
       // 如果还是没找到，选择第一个输入元素
       if (!commentInput && inputElements.length > 0) {
-        commentInput = await page.$$(inputElements[0].tagName === 'TEXTAREA' ? 'textarea' : 'input[type="text"]');
-        commentInput = commentInput[0];
+        const firstEl = inputElements[0];
+        if (firstEl.tagName === 'TEXTAREA' || firstEl.type === 'text') {
+          commentInput = await page.$$(firstEl.tagName === 'TEXTAREA' ? 'textarea' : 'input[type="text"]');
+          commentInput = commentInput[firstEl.index];
+        } else if (firstEl.isContentEditable) {
+          commentInput = await page.$$('[contenteditable="true"]');
+          commentInput = commentInput[firstEl.index];
+        }
         console.log("选择第一个输入元素作为评论输入框");
+        return commentInput;
       }
     } catch (e) {
       console.log("JavaScript查找评论输入框失败：", e.message);
-      throw new Error("未找到评论输入框");
+      return null;
     }
   }
   
-  // 最后的尝试：执行滚动，可能评论输入框在页面下方
-  if (!commentInput) {
-    console.log("最后尝试：滚动页面查找评论输入框...");
-    await page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
-    await page.waitForTimeout(2000);
-    
-    try {
-      commentInput = await page.$("textarea, input[type='text']");
-      if (commentInput) {
-        console.log("滚动后找到输入元素");
-      } else {
-        throw new Error("滚动后仍未找到输入元素");
-      }
-    } catch (e) {
-      console.log("滚动后查找失败：", e.message);
-      throw new Error("未找到评论输入框");
-    }
-  }
+  return commentInput;
+}
 
+/**
+ * 输入评论内容
+ */
+async function typeComment(page, commentInput, text) {
   // 聚焦并输入评论
   await commentInput.focus();
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(CONFIG.commentConfig.focusDelay);
 
-  // 逐字输入
-  for (const char of randomComment) {
-    await page.keyboard.type(char);
-    await page.waitForTimeout(Math.random() * 80 + 40);
+  // 获取元素的标签名，判断是否为可编辑元素
+  const elementTag = await page.evaluate(el => el.tagName, commentInput);
+  const isContentEditable = await page.evaluate(el => el.isContentEditable, commentInput);
+  
+  if (elementTag === 'P' || isContentEditable) {
+    // 对于可编辑的p标签，使用JavaScript设置内容
+    console.log("检测到可编辑p标签，使用JavaScript设置评论内容...");
+    await page.evaluate((el, text) => {
+      // 清空现有内容
+      el.innerHTML = '';
+      // 设置新内容
+      el.textContent = text;
+      // 触发输入事件，确保页面检测到内容变化
+      el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, commentInput, text);
+    console.log("已使用JavaScript设置评论内容");
+  } else {
+    // 传统的input或textarea，逐字输入
+    console.log("检测到传统输入框，使用逐字输入方式...");
+    for (const char of text) {
+      await page.keyboard.type(char);
+      const delay = Math.random() * (CONFIG.commentConfig.charTypeDelay.max - CONFIG.commentConfig.charTypeDelay.min) + CONFIG.commentConfig.charTypeDelay.min;
+      await page.waitForTimeout(delay);
+    }
   }
+}
 
+/**
+ * 查找并点击发送按钮
+ */
+async function findAndClickSendButton(page) {
+  console.log("正在查找发送按钮...");
+  
   // 尝试多种发送按钮选择器
   const sendBtnSelectors = [
     CONFIG.selectors.sendCommentBtn,
@@ -1326,12 +1373,14 @@ async function sendRandomComment(page) {
   ];
 
   let sendBtn = null;
+  let sendSelector = null;
   
   // 查找发送按钮
   for (const selector of sendBtnSelectors) {
     try {
       sendBtn = await page.$(selector);
       if (sendBtn) {
+        sendSelector = selector;
         console.log(`找到发送按钮：${selector}`);
         break;
       }
@@ -1374,8 +1423,43 @@ async function sendRandomComment(page) {
     await page.evaluate(el => el.click(), sendBtn);
     console.log("使用JavaScript点击发送按钮成功");
   }
+}
+
+/**
+ * 发送随机评论
+ */
+async function sendRandomComment(page) {
+  console.log("正在发送随机评论...");
   
-  await page.waitForTimeout(3000);
+  const randomComment = CONFIG.commentLib[Math.floor(Math.random() * CONFIG.commentLib.length)];
+  console.log(`准备发送评论：${randomComment}`);
+
+  // 先检查当前页面URL
+  const currentUrl = page.url();
+  console.log(`当前帖子页面URL：${currentUrl}`);
+  
+  // 保存页面截图，便于调试
+  if (CONFIG.pageConfig.commentScreenshot) {
+    await page.screenshot({ path: `post-page-${Date.now()}.png` });
+    console.log("已保存帖子页面截图");
+  }
+  
+  // 展开评论输入框
+  await expandCommentInput(page);
+  
+  // 查找评论输入框
+  const commentInput = await findCommentInput(page);
+  if (!commentInput) {
+    throw new Error("未找到评论输入框");
+  }
+  
+  // 输入评论内容
+  await typeComment(page, commentInput, randomComment);
+  
+  // 查找并点击发送按钮
+  await findAndClickSendButton(page);
+  
+  await page.waitForTimeout(CONFIG.commentConfig.sendDelay);
   console.log(`已发送评论：${randomComment}`);
   console.log("评论发送完成！");
 }
@@ -1399,7 +1483,7 @@ async function autoCommentTask() {
     
     browser = await puppeteer.launch({
       ...CONFIG.browserOptions,
-      headless: isCI ? "new" : false, // CI环境使用无头模式，本地使用有头模式
+      headless: "new", // 所有环境都使用无头模式，不打开网页
       args: [
         ...CONFIG.browserOptions.args,
         "--no-sandbox", // CI环境必需
@@ -1407,10 +1491,7 @@ async function autoCommentTask() {
         "--disable-gpu", // 禁用GPU加速
         "--disable-dev-shm-usage", // 避免共享内存问题
         "--window-size=1920,1080",
-        "--disable-blink-features=AutomationControlled",
-        "--ozone-platform=wayland", // 解决X服务器问题
-        "--enable-features=UseOzonePlatform",
-        "--ozone-platform-hint=wayland"
+        "--disable-blink-features=AutomationControlled"
       ]
     });
     const page = await browser.newPage();
@@ -1427,14 +1508,14 @@ async function autoCommentTask() {
 
     // 点击社区链接，确保在正确的页面
     console.log("正在点击社区链接...");
-    const communitySelector = "#app > div.header.add-border.color-opacity-white.position-top > div > div.nav-wrapper > div > ul > li:nth-child(2) > a";
+    const communitySelector = CONFIG.selectors.communityLink;
     
     try {
       const communityLink = await page.$(communitySelector);
       if (communityLink) {
         await communityLink.click();
         console.log("已点击社区链接");
-        await page.waitForNavigation({ waitUntil: ["networkidle2", "domcontentloaded"], timeout: 60000 });
+        await page.waitForNavigation({ waitUntil: ["networkidle2", "domcontentloaded"], timeout: CONFIG.pageConfig.navigationTimeout });
         await page.waitForTimeout(3000);
       } else {
         console.log("未找到社区链接，尝试使用通用选择器...");
@@ -1455,7 +1536,7 @@ async function autoCommentTask() {
             if (link) {
               await link.click();
               console.log(`已点击社区链接：${selector}`);
-              await page.waitForNavigation({ waitUntil: ["networkidle2", "domcontentloaded"], timeout: 60000 });
+              await page.waitForNavigation({ waitUntil: ["networkidle2", "domcontentloaded"], timeout: CONFIG.pageConfig.navigationTimeout });
               await page.waitForTimeout(3000);
               break;
             }
