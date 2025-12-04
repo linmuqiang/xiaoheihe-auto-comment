@@ -34,7 +34,7 @@ const CONFIG = {
     communityLink: "#app > div.header.add-border.color-opacity-white.position-top > div > div.nav-wrapper > div > ul > li:nth-child(2) > a", // 社区链接
     // 用户提供的准确CSS选择器（首选）
     // 注意：评论框默认是折叠状态，需要先点击展开
-    commentInput: "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.collapse.link-comment__reply > div > div.link-reply__input-wrapper",
+    commentInput: "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.expand.link-comment__reply > div > div > div.link-reply__editor.link-reply__input > div > p",
     sendCommentBtn: "#hb-website > div.hb-layout__main.hb-website__container.hb-page__app > div.hb-layout-main__container--main > div > div > div > div.hb-layout__fake-frame-container > div > div.link-reply.expand.link-comment__reply > div > div > div.link-reply__menu-box > button.link-reply__menu-btn.hb-color__btn--confirm",
     closePopup: "div[class*='close'], button[class*='close'], svg[class*='close']"
   },
