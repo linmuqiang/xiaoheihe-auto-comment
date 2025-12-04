@@ -23,7 +23,7 @@ const CONFIG = {
   executeTime: "08:00", // 北京时间
   // 评论内容库（可自定义扩展）
   commentLib: [
-    "666"
+    "水"
   ],
   // 小黑盒 DOM 选择器（已适配最新版，若失效需重新获取）
   selectors: {
