@@ -1,0 +1,242 @@
+[
+  {
+    "name": "permission",
+    "value": "0",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "ac",
+    "value": "undefined",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "br",
+    "value": "0",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "bes",
+    "value": "%5B%5D",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "bea",
+    "value": "%5B%5D",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "beb",
+    "value": "%5B%5D",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "bms",
+    "value": "%5B%5D",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "bma",
+    "value": "%5B%5D",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "bmb",
+    "value": "%5B%5D",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "fss",
+    "value": "0",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "fsa",
+    "value": "0",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "fsb",
+    "value": "0",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765197715,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "smidV2",
+    "value": "202512012041568fd81297763c2e44c8bd26227b1042f900a7703aa14cc4c90",
+    "domain": "www.xiaoheihe.cn",
+    "path": "/",
+    "expires": 1799152916.482829,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "_ga",
+    "value": "GA1.1.451977537.1764592926",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1799282216.801263,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "Hm_lvt_dfc8b88f31d0ba1cef80180022f4b3df",
+    "value": "1764592886,1764677010",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1796213010,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "user_pkey",
+    "value": "MTc2NDY4MjU3My45MV8yNTY0OTQ4MmdnbWhwZWhzcXF4bmd0Y3Q__",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765287374.98962,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "user_heybox_id",
+    "value": "25649482",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765287374.989766,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "heybox_id",
+    "value": "25649482",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765892174,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "avatar",
+    "value": "https%3A//imgheybox.max-c.com/avatar/2025/09/20/4d45154cf0728b275ba258a59f278817.jpeg%3FimageMogr2/thumbnail/100x100%253E",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765892174,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "level",
+    "value": "11",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765892174,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "nickname",
+    "value": "Linxi%u4E36",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765892174,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "_ga_DZ9BGTZW4G",
+    "value": "GS2.1.s1764722080$o6$g1$t1764722216$j59$l0$h0",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1799282216.825974,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": ".thumbcache_4e0097a83862d42d22aeee22fef74bbf",
+    "value": "1d/DmYAWAu9Q3D2cv8yW2E92bTm01peFLve/TNyhom8eYlstBCdLUGf4R/r4ENj+7xo3EorO76kN+oP6/VxQog%3D%3D",
+    "domain": "www.xiaoheihe.cn",
+    "path": "/",
+    "expires": 1799282218.320157,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  },
+  {
+    "name": "x_xhh_tokenid",
+    "value": "B1d/DmYAWAu9Q3D2cv8yW2E92bTm01peFLve/TNyhom8eYlstBCdLUGf4R/r4ENj+7xo3EorO76kN+oP6/VxQog%3D%3D",
+    "domain": ".xiaoheihe.cn",
+    "path": "/",
+    "expires": 1765931818,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "unspecified"
+  }
+]

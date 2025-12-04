@@ -23,7 +23,7 @@ const CONFIG = {
   executeTime: "08:00", // 北京时间
   // 评论内容库（可自定义扩展）
   commentLib: [
-    "666",
+    "666"
   ],
   // 小黑盒 DOM 选择器（已适配最新版，若失效需重新获取）
   selectors: {
@@ -72,6 +72,13 @@ const CONFIG = {
 };
 
 // ==================== 工具函数 ====================
+/**
+ * 替代已弃用的page.waitForTimeout方法
+ */
+async function waitForTimeout(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
 /**
  * 保存cookies到文件
  */
@@ -139,7 +146,7 @@ async function validateCookies(page) {
       timeout: CONFIG.pageConfig.navigationTimeout
     });
     
-    await page.waitForTimeout(3000);
+    await waitForTimeout(3000);
     
     // 检查当前URL是否包含登录标识
     const currentUrl = page.url();
@@ -1477,22 +1484,9 @@ async function autoCommentTask() {
   console.log(`\n[${new Date().toLocaleString()}] 开始执行小黑盒自动评论任务...`);
 
   try {
-    // 启动浏览器（适配本地环境和 CI 环境）
-    // 在 GitHub Actions 环境中使用无头模式，本地环境使用有头模式
-    const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-    
+    // 启动浏览器（所有环境都使用无头模式）
     browser = await puppeteer.launch({
-      ...CONFIG.browserOptions,
-      headless: "new", // 所有环境都使用无头模式，不打开网页
-      args: [
-        ...CONFIG.browserOptions.args,
-        "--no-sandbox", // CI环境必需
-        "--disable-setuid-sandbox", // CI环境必需
-        "--disable-gpu", // 禁用GPU加速
-        "--disable-dev-shm-usage", // 避免共享内存问题
-        "--window-size=1920,1080",
-        "--disable-blink-features=AutomationControlled"
-      ]
+      ...CONFIG.browserOptions
     });
     const page = await browser.newPage();
 
